@@ -1,0 +1,309 @@
+import java.awt.Color;
+import java.awt.Dimension;
+import java.awt.GraphicsDevice;
+import java.awt.GraphicsEnvironment;
+import java.awt.Rectangle;
+import java.awt.Robot;
+import java.awt.Toolkit;
+import java.awt.image.BufferedImage;
+import java.io.File;
+import javax.imageio.ImageIO;
+import java.util.*;
+
+
+public class ScreenLightsV2
+{
+    //Class Variables
+	
+	//Screen Shot
+	BufferedImage screenShot;
+	
+	//Color Values
+    int r;
+    int g;
+    int b;
+    
+    //Screen Dimensions
+    int width;
+    int height;
+    
+    //Number of LED lights
+    int XnumLEDLights;
+    int YnumLEDLights;
+    
+    //Matrixes
+    
+    //ArrayList<ArrayList<Integer>> matrix = new ArrayList<ArrayList<Integer>>();
+    
+    ArrayList<ArrayList<Integer>> Left = new ArrayList<ArrayList<Integer>>();
+    //Left.add(new ArrayList<Integer>());
+    
+    ArrayList<ArrayList<Integer>> Right = new ArrayList<ArrayList<Integer>>();
+    
+    ArrayList<ArrayList<Integer>> Top = new ArrayList<ArrayList<Integer>>();
+    ArrayList<ArrayList<Integer>> Bottom = new ArrayList<ArrayList<Integer>>();
+    
+    //Construct
+    public ScreenLightsV2(){
+    	
+    	//Screen Resolution
+    	//For MultiMonitor
+    	GraphicsDevice gd = GraphicsEnvironment.getLocalGraphicsEnvironment().getDefaultScreenDevice();
+    	width = gd.getDisplayMode().getWidth();
+    	height = gd.getDisplayMode().getHeight();
+    	
+    	/* For Single Monitor
+        Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
+        width = (int) screenSize.getWidth();
+        height = (int) screenSize.getHeight();
+        */
+    }
+    
+    //Get Methods
+    public BufferedImage getImage(){
+    	return screenShot;
+    }
+    
+    public int getRed(){
+    	return r;
+    }
+    
+    public int getGreen(){
+    	return g;
+    }
+    
+    public int getBlue(){
+    	return b;
+    }
+    
+    public ArrayList<ArrayList<Integer>> getxLeft(){
+    	return Left;
+    }
+    
+    public ArrayList<ArrayList<Integer>> getxRight(){
+    	return Right;
+    }
+    
+    public ArrayList<ArrayList<Integer>> getyTop(){
+    	return Top;
+    }
+    
+    public ArrayList<ArrayList<Integer>> getyBottom(){
+    	return Bottom;
+    }
+    
+    //Take new screenShot
+    public void refreshRobo() throws Exception{
+        Robot robot = new Robot();
+        screenShot = robot.createScreenCapture(new Rectangle(Toolkit.getDefaultToolkit().getScreenSize()));
+    }
+    
+    //Analyze Image for the RGB values
+    public void analyzeImage(){
+    	//Reset values
+        r=0;
+        g=0;
+        b=0;
+    	
+    	//Skip every alternate pixel making my program 4 times faster
+    	for(int i =0;i<width; i=i+2){
+    		for(int j=0; j<height;j=j+2){
+    			int pixel = screenShot.getRGB(i,j); //the ARGB integer has the colors of pixel (i,j)
+    			r = r+(int)(255&(pixel>>16)); //add up reds
+    			g = g+(int)(255&(pixel>>8)); //add up greens
+    			b = b+(int)(255&(pixel)); //add up blues
+    		}
+    	}
+    	
+    	r = r/(int)((width/2)*(height/2));
+    	g = g/(int)((width/2)*(height/2));
+    	b = b/(int)((width/2)*(height/2));
+    	
+    }
+    
+    //Analyze Image for the RGB values on portion of image. Input is percent screen 
+    	//(i.e. (0,50,0,10) is first percent of screen and ten percent from bottom
+    public int[] analyzePartOfImage(int xBegin, int xEnd, int yBegin, int yEnd){
+    	//Reset values
+    	int[] RGBValues = new int[3];
+    	r=0;
+        g=0;
+        b=0;
+        
+        //Find Pixel Start and End
+        int xBeginPixel = (xBegin/100)*width;
+    	int xEndPixel = (int) ( (double) (xEnd)/100*width);
+        
+    	int yBeginPixel = (int) ( (double) (yBegin)/100*height);
+        int yEndPixel = (int) ( (double) (yEnd)/100*height);
+        
+        //Skip Pixels to speed up process (i.e. skip by 2 makes it 4x faster)
+        int skipTime = 2;
+        
+    	for(int i = 0; i < (xEndPixel-xBeginPixel); i=i+skipTime){
+    		for(int j = 0; j < (yEndPixel-yBeginPixel); j=j+skipTime){
+    			int pixel = screenShot.getRGB(i,j); //the ARGB integer has the colors of pixel (i,j)
+    			r = r+(int)(255&(pixel>>16)); //add up reds
+    			g = g+(int)(255&(pixel>>8)); //add up greens
+    			b = b+(int)(255&(pixel)); //add up blues
+    		}
+    	}
+
+    	int numPixels = ((xEndPixel-xBeginPixel)/skipTime)*((yEndPixel-yBeginPixel)/skipTime);
+    	
+    	
+    	RGBValues[0] = (r/numPixels);
+    	RGBValues[1] = (g/numPixels);
+    	RGBValues[2] = (b/numPixels);
+    	
+    	return RGBValues;
+    }
+    
+    public void YSectionLEDStrip(){
+    	int yPercent = 15;
+    	
+    	int YnumLEDLights = 10; //10 LED lights
+    	int percentStep = YnumLEDLights;
+    	int start;
+
+    	int[] temp = new int[3];
+    	ArrayList<Integer> tempArray  = new ArrayList<Integer>();
+    	
+    	for(int i = 0; i < YnumLEDLights; i++){
+    		start = (i+1)*percentStep;
+    		//Top Section
+    		temp = analyzePartOfImage(start, start+percentStep, 100-yPercent, 100);
+    		tempArray.add(temp[0]);
+    		tempArray.add(temp[1]);
+    		tempArray.add(temp[2]);
+    		
+    		Top.add(tempArray);
+    		tempArray.clear();
+    		
+    		//Bottom Section
+    		temp = analyzePartOfImage(start, start+percentStep, 0, yPercent); 
+    		tempArray.add(temp[0]);
+    		tempArray.add(temp[1]);
+    		tempArray.add(temp[2]);
+    		
+    		Bottom.add(tempArray);
+    		tempArray.clear();
+    	}
+    	
+    }
+    
+    public void XSectionLEDStrip(){
+    	int xPercent = 15;
+    	
+    	int XnumLEDLights = 10; //10 LED lights
+    	int percentStep = XnumLEDLights;
+    	int start;
+
+    	int[] temp = new int[3];
+    	ArrayList<Integer> tempArray  = new ArrayList<Integer>();
+    	
+    	for(int i = 0; i < XnumLEDLights; i++){
+    		start = (i+1)*percentStep;
+    		//Right Section
+    		temp = analyzePartOfImage(100-xPercent, 100, start, start+percentStep);
+    		tempArray.add(temp[0]);
+    		tempArray.add(temp[1]);
+    		tempArray.add(temp[2]);
+    		
+    		Right.add(tempArray);
+    		tempArray.clear();
+    		//Left Section
+    		temp = analyzePartOfImage(0, xPercent, start, start+percentStep);
+    		tempArray.add(temp[0]);
+    		tempArray.add(temp[1]);
+    		tempArray.add(temp[2]);
+    		
+    		
+    		Left.add(tempArray);
+    		tempArray.clear();
+    	}
+    	
+    }
+    
+    public void printArray(){
+    	System.out.print(Left.get(0)+" | ");
+    	boolean s = false;
+    	System.out.println("Left");
+    	for (int i=0; i < Left.size(); i++){
+    		for (int j=0; j < Left.get(0).size(); j++){
+    			System.out.print(Left.get(i).get(j)+" | ");
+    			
+    		}
+    	}
+    	System.out.println("");
+    	
+    	//--------------------
+    	
+    	System.out.println("Right");
+    	for (int i=0; i < Right.size(); i++){
+    		for (int j=0; j < Right.get(0).size(); j++){
+    			System.out.print(Right.get(i).get(j)+" | ");
+    		}
+    	}
+    	System.out.println("");
+    	
+    	//------------------
+    	
+    	System.out.println("Top");
+    	for (int i=0; i < Top.size(); i++){
+    		for (int j=0; j < Top.get(0).size(); j++){
+    			System.out.print(Top.get(i).get(j)+" | ");
+    		}
+    	}
+    	System.out.println("");
+    	
+    	//--------------------
+    	
+    	System.out.println("Bottom");
+    	for (int i=0; i < Bottom.size(); i++){
+    		for (int j=0; j < Bottom.get(0).size(); j++){
+    				System.out.print(Bottom.get(i).get(j)+" | ");
+    		}
+    	}
+    	System.out.println("");
+    	
+    	//--------------------
+    	
+    	/*
+    	System.out.println(xLeft.length);
+    	System.out.println(xRight.length);
+    	System.out.println(yTop.length);
+    	System.out.println(yBottom.length);
+    	*/
+    }
+    
+    public void run() throws Exception{
+    	this.refreshRobo();
+        this.XSectionLEDStrip();
+        this.YSectionLEDStrip();
+    }
+    
+    public void sentToArduino(){
+    	//Send Data to Arduino Nano
+    }
+
+    public static void main(String[] args) throws Exception
+    {
+    	ScreenLightsV2 test = new ScreenLightsV2();
+        while(true)
+        {
+        	
+            test.refreshRobo();
+            test.XSectionLEDStrip();
+            test.YSectionLEDStrip();
+            //test.run();
+        	test.printArray();
+            
+            Thread.sleep(10000);
+        }
+    }
+}
+/*
+So it works! Now I need to divide it in parts. I can just do it manual but would like automation.
+In the end the screen resolution is 5760x1080.
+*/
